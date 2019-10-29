@@ -13,7 +13,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 
 RUN cd /root && \
-    git clone https://github.com/loomis/nuvlabox-video.git
+    git clone https://github.com/loomis/example-opencv.git
 
-CMD ["/root/nuvlabox-video/app.py", "80", "640", "480", "4"]
+CMD ["/root/example-opencv/app.py", "80", "640", "480", "4"]
 

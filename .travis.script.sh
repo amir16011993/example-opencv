@@ -6,7 +6,7 @@ DOCKER_TAG="latest"
 
 MANIFEST=${DOCKER_ORG}/${DOCKER_IMAGE}:${DOCKER_TAG}
 
-platforms=(arm64 amd64)
+platforms=(armhf arm64 amd64)
 manifest_args=(${MANIFEST})
 
 #
