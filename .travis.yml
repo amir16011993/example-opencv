@@ -1,0 +1,8 @@
+language: minimal
+dist: xenial
+addons:
+  apt:
+    packages:
+    - docker-ce
+before_install: "./.travis.before_install.sh"
+script: "./.travis.script.sh"

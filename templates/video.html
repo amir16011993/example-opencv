@@ -1,0 +1,25 @@
+<html>
+  <head>
+    <title>NuvlaBox Video Demonstration</title>
+    <script src="{{ url_for('static', filename='jquery-3.0.0.min.js') }}" type="text/javascript"></script>
+  </head>
+  <body>
+    <h1>Face Detection Analysis</h1>
+    <img id="image" src="" />
+    <script type="text/javascript">
+      cnt = 0;
+
+      function refresh() {
+        var image = $("#image");
+        image.attr("src", "{{ url_for('jpeg') }}?c="+(cnt++));
+      }
+
+      $(document).ready(function() {
+        var image = $("#image");
+        image.on("load", function(){refresh()});
+        refresh(true);
+      });
+    </script>
+  </body>
+</html>
+
