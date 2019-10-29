@@ -1,6 +1,6 @@
 #!/bin/bash -xe
 
-DOCKER_ORG="loomis"
+DOCKER_ORG="clomps"
 DOCKER_IMAGE="example-opencv"
 DOCKER_TAG="latest"
 
