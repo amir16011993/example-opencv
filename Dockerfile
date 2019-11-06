@@ -12,8 +12,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
 
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 
-RUN cd /root && \
-    git clone https://github.com/loomis/example-opencv.git
+COPY . /root/example-opencv
 
 CMD ["/root/example-opencv/app.py", "80", "640", "480", "4"]
 
