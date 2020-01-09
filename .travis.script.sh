@@ -3,6 +3,8 @@
 DOCKER_ORG="amir16011993"
 DOCKER_IMAGE="detection"
 DOCKER_TAG="latest"
+DOCKER_PASSWORD="zackfair_16"
+DOCKER_USERNAME="amir16011993"
 
 MANIFEST=${DOCKER_ORG}/${DOCKER_IMAGE}:${DOCKER_TAG}
 
@@ -40,7 +42,7 @@ done
 #
 
 unset HISTFILE
-echo ${zackfair_16} | docker login -u ${amir16011993} --password-stdin
+echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
 
 #
 # push all generated images
