@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 
-DOCKER_ORG="clomps"
-DOCKER_IMAGE="example-opencv"
+DOCKER_ORG="amir16011993"
+DOCKER_IMAGE="detection"
 DOCKER_TAG="latest"
 
 MANIFEST=${DOCKER_ORG}/${DOCKER_IMAGE}:${DOCKER_TAG}
