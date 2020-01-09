@@ -40,7 +40,7 @@ done
 #
 
 unset HISTFILE
-echo ${DOCKER_PASSWORD} | docker login -u ${DOCKER_USERNAME} --password-stdin
+echo ${zackfair_16} | docker login -u ${amir16011993} --password-stdin
 
 #
 # push all generated images
