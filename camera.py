@@ -159,19 +159,19 @@ class Camera(object):
             
     def classify(image1):
     # load the COCO class labels our Mask R-CNN was trained on
-        labelsPath = os.path.sep.join([mask-rcnn-coco,"object_detection_classes_coco.txt"])
+        labelsPath = os.path.sep.join(["~/mask-rcnn-coco","object_detection_classes_coco.txt"])
         LABELS = open(labelsPath).read().strip().split("\n")
 
         # load the set of colors that will be used when visualizing a given
         # instance segmentation
-        colorsPath = os.path.sep.join([mask-rcnn-coco, "colors.txt"])
+        colorsPath = os.path.sep.join(["~/mask-rcnn-coco", "colors.txt"])
         COLORS = open(colorsPath).read().strip().split("\n")
         COLORS = [np.array(c.split(",")).astype("int") for c in COLORS]
         COLORS = np.array(COLORS, dtype="uint8")
 
         # derive the paths to the Mask R-CNN weights and model configuration
-        weightsPath = os.path.sep.join([mask-rcnn-coco,"frozen_inference_graph.pb"])
-        configPath = os.path.sep.join([mask-rcnn-coco,"mask_rcnn_inception_v2_coco_2018_01_28.pbtxt"])
+        weightsPath = os.path.sep.join(["~/mask-rcnn-coco","frozen_inference_graph.pb"])
+        configPath = os.path.sep.join(["~/mask-rcnn-coco","mask_rcnn_inception_v2_coco_2018_01_28.pbtxt"])
 
         # load our Mask R-CNN trained on the COCO dataset (90 classes)
         # from disk
