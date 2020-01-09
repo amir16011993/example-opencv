@@ -8,6 +8,10 @@ import utils
 import threading
 import collections
 import requests
+import numpy as np
+import argparse
+import random
+import os
 
 #from profilehooks import profile # pip install profilehooks
 
@@ -61,12 +65,7 @@ class Camera(object):
 
         self.camera_fps = Fps(50)
         self.network_fps = Fps(25)
-        self.identify_fps = Fps(15)
-
-        self._faces = []
-        self._faces_lock = threading.Lock()
-
-        self.identify_faces_queue = utils.RenewQueue()
+        
         self.prepare_frame_queue = utils.RenewQueue()
         self.request_image_queue = utils.RenewQueue()
 
@@ -76,7 +75,6 @@ class Camera(object):
         self.height = int(self.video.get(4))
         print('%sx%s' % (self.width, self.height))
 
-        self.identify_faces_threads_number = threads
 
         self.get_frame_thread = threading.Thread(target=self.run_get_frame, name='get_frame')
         self.get_frame_thread.daemon = True
@@ -86,25 +84,9 @@ class Camera(object):
         self.prepare_frame_thread.daemon = True
         self.prepare_frame_thread.start()
 
-        self.identify_faces_threads = [threading.Thread(target=self.run_identify_faces, name='identify_faces#%i' % (i+1,))
-                                       for i in range(self.identify_faces_threads_number)]
-        for thread in self.identify_faces_threads:
-            thread.daemon=True
-            thread.start()
-
     def __del__(self):
         self.video.release()
-
-    @property
-    def faces(self):
-        with self._faces_lock:
-            return self._faces
-
-    @faces.setter
-    def faces(self, value):
-        with self._faces_lock:
-            self._faces = value
-
+        
     def run_get_frame(self):
         while True:
             frame = self.get_frame()
@@ -118,34 +100,9 @@ class Camera(object):
             image = self.encode_frame_to_jpeg(frame)
             self.request_image_queue.put(image)
 
-    def run_identify_faces(self):
-        while True:
-            frame = self.identify_faces_queue.get()
-            self.identify_faces(frame)
-
     def script_path(self):
         return os.path.dirname(os.path.realpath(__file__))
 
-    #@profile
-    def identify_faces(self, frame):
-        cascade_path = os.path.join(self.script_path(),
-                                    'haarcascade_frontalface_default.xml')
-        # Create the haar cascade
-        faceCascade = cv2.CascadeClassifier(cascade_path)
-
-        # Get a grayscale verion of the frame
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # Detect faces in the frame
-        self.faces = faceCascade.detectMultiScale(
-           gray,
-           scaleFactor=1.1,
-           minNeighbors=20,
-           minSize=(40, 40),
-           flags = cv2.CASCADE_SCALE_IMAGE
-        )
-
-        self.identify_fps.new_frame()
 
     @staticmethod
     def send_to_influxdb(url, payload):
@@ -155,47 +112,17 @@ class Camera(object):
             print("Unable to write into InfluxDB: %s" % e)
             pass
 
-    def draw_faces_rectangles(self, frame):
-        ''' Draw a rectangle around the faces '''
-        if not isinstance(self.faces, list) and type(self.faces).__module__ == "numpy":
-
-            db = os.getenv("INFLUXDB_DATABASE")
-            base_url = os.getenv("INFLUXDB_ENDPOINT")
-            if base_url == "/":
-                base_url = base_url[0:-1]
-
-            payload = "face_area value=%.2f" % ( (self.faces[0][2] * self.faces[0][3]))
-
-            url = '%s/write?db=%s' % (base_url, db)
-
-            tmp_thread = threading.Thread(target=self.send_to_influxdb, name='send_to_influxdb', args=[url, payload])
-            tmp_thread.daemon = True
-            tmp_thread.start()
-
-
-
-        for (x, y, w, h) in self.faces:
-           cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
-
     def draw_fps(self, frame):
         camera_fps = self.camera_fps()
         if camera_fps is not None:
-            cv2.putText(frame, '{:5.2f} camera fps'.format(camera_fps),
-                        (10,self.height-50), self.font, 0.6, (250,25,250), 2)
+            cv2.putText(frame, '{:5.2f} camera fps'.format(camera_fps),(10,self.height-50), self.font, 0.6, (250,25,250), 2)
 
         network_fps = self.network_fps()
         if network_fps is not None:
-            cv2.putText(frame, '{:5.2f} effective fps'.format(network_fps),
-                        (10,self.height-30), self.font, 0.6, (250,25,250), 2)
-
-        identify_fps = self.identify_fps()
-        if identify_fps is not None:
-            cv2.putText(frame, '{:5.2f} identifications/sec'.format(identify_fps),
-                        (10,self.height-10), self.font, 0.6, (250,25,250), 2)
+            cv2.putText(frame, '{:5.2f} effective fps'.format(network_fps),(10,self.height-30), self.font, 0.6, (250,25,250), 2)
 
     def draw_date(self, frame):
-        cv2.putText(frame, time.strftime("%c"), (10,20), self.font, 0.6,
-                    (250,25,250), 2)
+        cv2.putText(frame, time.strftime("%c"), (10,20), self.font, 0.6,(250,25,250), 2)
 
     #@profile
     def get_frame(self):
@@ -208,30 +135,20 @@ class Camera(object):
         # We are using Motion JPEG, but OpenCV defaults to capture raw images,
         # so we must encode it into JPEG in order to correctly display the
         # video stream.
-        ret, jpeg = cv2.imencode('.jpg', frame,
-                                 (cv2.IMWRITE_JPEG_QUALITY, self.quality))
+        ret, jpeg = cv2.imencode('.jpg', frame,(cv2.IMWRITE_JPEG_QUALITY, self.quality))
         return jpeg.tobytes()
 
     #@profile
     def prepare_frame(self, frame):
         self.draw_fps(frame)
         self.draw_date(frame)
-        self.draw_faces_rectangles(frame)
 
     #@profile
     def request_image(self):
         image = self.request_image_queue.get()
+        img=classify(image)
         self.network_fps.new_frame()
-        return image
-
-    # Not used. Old synchronous version
-    def get_image(self):
-        frame = self.get_frame()
-        self.identify_faces(frame)
-        self.draw_fps(frame)
-        self.draw_date(frame)
-        self.draw_faces_rectangles(frame)
-        return self.encode_frame_to_jpeg(frame)
+        return img
 
     def mjpeg_generator(self):
         """Video streaming generator function."""
@@ -239,6 +156,102 @@ class Camera(object):
             image = self.request_image()
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + image + b'\r\n')
+            
+    def classify(image1):
+    # load the COCO class labels our Mask R-CNN was trained on
+        labelsPath = os.path.sep.join([mask-rcnn-coco,"object_detection_classes_coco.txt"])
+        LABELS = open(labelsPath).read().strip().split("\n")
+
+        # load the set of colors that will be used when visualizing a given
+        # instance segmentation
+        colorsPath = os.path.sep.join([mask-rcnn-coco, "colors.txt"])
+        COLORS = open(colorsPath).read().strip().split("\n")
+        COLORS = [np.array(c.split(",")).astype("int") for c in COLORS]
+        COLORS = np.array(COLORS, dtype="uint8")
+
+        # derive the paths to the Mask R-CNN weights and model configuration
+        weightsPath = os.path.sep.join([mask-rcnn-coco,"frozen_inference_graph.pb"])
+        configPath = os.path.sep.join([mask-rcnn-coco,"mask_rcnn_inception_v2_coco_2018_01_28.pbtxt"])
+
+        # load our Mask R-CNN trained on the COCO dataset (90 classes)
+        # from disk
+        print("[INFO] loading Mask R-CNN from disk...")
+        net = cv2.dnn.readNetFromTensorflow(weightsPath, configPath)
+
+        # load our input image and grab its spatial dimensions
+        image = cv2.imread(image1)
+        (H, W) = image.shape[:2]
+
+        # construct a blob from the input image and then perform a forward
+        # pass of the Mask R-CNN, giving us (1) the bounding box  coordinates
+        # of the objects in the image along with (2) the pixel-wise segmentation
+        # for each specific object
+        blob = cv2.dnn.blobFromImage(image, swapRB=True, crop=False)
+        net.setInput(blob)
+        start = time.time()
+        (boxes, masks) = net.forward(["detection_out_final", "detection_masks"])
+        end = time.time()
+
+        # show timing information and volume information on Mask R-CNN
+        print("[INFO] Mask R-CNN took {:.6f} seconds".format(end - start))
+        print("[INFO] boxes shape: {}".format(boxes.shape))
+        print("[INFO] masks shape: {}".format(masks.shape))
+
+        # loop over the number of detected objects
+        for i in range(0, boxes.shape[2]):
+            # extract the class ID of the detection along with the confidence
+            # (i.e., probability) associated with the prediction
+            classID = int(boxes[0, 0, i, 1])
+            confidence = boxes[0, 0, i, 2]
+
+            # filter out weak predictions by ensuring the detected probability
+            # is greater than the minimum probability
+            if confidence > 0.5:
+                # clone our original image so we can draw on it
+                clone = image.copy()
+
+                # scale the bounding box coordinates back relative to the
+                # size of the image and then compute the width and the height
+                # of the bounding box
+                box = boxes[0, 0, i, 3:7] * np.array([W, H, W, H])
+                (startX, startY, endX, endY) = box.astype("int")
+                boxW = endX - startX
+                boxH = endY - startY
+
+                # extract the pixel-wise segmentation for the object, resize
+                # the mask such that it's the same dimensions of the bounding
+                # box, and then finally threshold to create a *binary* mask
+                mask = masks[i, classID]
+                mask = cv2.resize(mask, (boxW, boxH),
+                    interpolation=cv2.INTER_NEAREST)
+                mask = (mask > 0.3)
+
+                # extract the ROI of the image
+                roi = clone[startY:endY, startX:endX]
+
+                # now, extract *only* the masked region of the ROI by passing
+                # in the boolean mask array as our slice condition
+                roi = roi[mask]
+
+                # randomly select a color that will be used to visualize this
+                # particular instance segmentation then create a transparent
+                # overlay by blending the randomly selected color with the ROI
+                color = random.choice(COLORS)
+                blended = ((0.4 * color) + (0.6 * roi)).astype("uint8")
+
+                # store the blended ROI in the original image
+                clone[startY:endY, startX:endX][mask] = blended
+
+                # draw the bounding box of the instance on the image
+                color = [int(c) for c in color]
+                cv2.rectangle(clone, (startX, startY), (endX, endY), color, 2)
+
+                # draw the predicted label and associated probability of the
+                # instance segmentation on the image
+                text = "{}: {:.4f}".format(LABELS[classID], confidence)
+                cv2.putText(clone, text, (startX, startY - 5),cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+                return clone
+                                
 
 
 def main():
