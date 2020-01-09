@@ -5,7 +5,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y python3 python3-pip python3-opencv -qq && \
-    apt-get install numpy && \
+    pip3 install numpy scipy && \
     apt-get install -y -qq --no-install-recommends usbutils git && \
     pip3 install requests flask && \
     apt-get clean && \
